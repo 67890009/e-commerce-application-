@@ -9,11 +9,17 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class UserRole(str, enum.Enum):
-    """Allowed user roles. Inherits from str so JSON serialization works naturally."""
-
     CUSTOMER = "customer"
     SELLER = "seller"
     ADMIN = "admin"
+
+
+class SellerStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUSPENDED = "suspended"
+    BANNED = "banned"
 
 
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -28,9 +34,13 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         String(255), unique=True, nullable=True
     )
     role: Mapped[str] = mapped_column(String(10), nullable=False)
-    seller_approved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    seller_rejected: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    business_name: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    seller_status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )
+    status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )
@@ -39,6 +49,11 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         CheckConstraint(
             "role IN ('customer', 'seller', 'admin')",
             name="ck_users_role",
+        ),
+        CheckConstraint(
+            "seller_status IS NULL OR seller_status IN "
+            "('pending', 'approved', 'rejected', 'suspended', 'banned')",
+            name="ck_users_seller_status",
         ),
     )
 

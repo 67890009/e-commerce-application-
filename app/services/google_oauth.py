@@ -18,7 +18,7 @@ from app.core.security import (
 )
 from app.models.google_auth_code import GoogleAuthCode
 from app.models.refresh_token import RefreshToken
-from app.models.user import User
+from app.models.user import SellerStatus, User
 from app.schemas.auth import AuthResponse, UserResponse
 
 # ── Google OAuth Endpoints ──────────────────────────────────────
@@ -27,9 +27,6 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
-# One-time code TTL for the browser redirect flow.
-# 60 seconds is more than enough for the browser to redirect
-# and the frontend to make the exchange request.
 _OAUTH_CODE_TTL_SECONDS = 60
 
 
@@ -64,10 +61,7 @@ async def handle_google_callback(
     2. Use that token to fetch the user's profile from Google.
     3. Create a new user or link Google identity to an existing account.
     4. Generate a short-lived one-time code, store its hash.
-    5. Return the RAW one-time code — the route handler will
-       redirect the browser to the frontend with this code in the URL.
-
-    Returns the raw one-time code (to be appended to the frontend redirect URL).
+    5. Return the RAW one-time code.
     """
     async with httpx.AsyncClient(timeout=10.0) as client:
         # Step 1: Exchange code for Google access token
@@ -187,7 +181,7 @@ async def exchange_google_code(
     access_token = create_access_token(
         user_id=str(user.id),
         role=user.role,
-        seller_approved=user.seller_approved,
+        seller_approved=user.seller_status == SellerStatus.APPROVED.value,
     )
 
     raw_refresh = generate_refresh_token()
@@ -237,20 +231,16 @@ async def _get_or_create_user(
         # Auto-link: attach Google identity if not already linked
         if user.google_id is None:
             user.google_id = google_id
-        # If google_id is already set and matches, this is a
-        # returning Google user — nothing to do.
         return user
 
     # New user — Google signups are always customers.
-    # Cannot create seller/admin via OAuth.
     user = User(
         full_name=full_name or email.split("@")[0],
         email=email,
         hashed_password=None,
         google_id=google_id,
         role="customer",
-        seller_approved=None,
-        seller_rejected=None,
+        seller_status=None,
     )
     db.add(user)
     await db.flush()

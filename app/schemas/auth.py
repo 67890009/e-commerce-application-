@@ -19,6 +19,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     role: Literal["customer", "seller"]
+    business_name: str | None = Field(None, max_length=255)
 
     @field_validator("password")
     @classmethod
@@ -63,7 +64,7 @@ class UserResponse(BaseModel):
     full_name: str
     email: str
     role: str
-    seller_approved: bool | None = None
+    seller_status: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

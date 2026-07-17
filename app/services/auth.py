@@ -16,7 +16,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.refresh_token import RefreshToken
-from app.models.user import User
+from app.models.user import SellerStatus, User
 from app.schemas.auth import AuthResponse, RefreshResponse, UserResponse
 
 
@@ -33,7 +33,7 @@ async def _create_token_pair(
     access_token = create_access_token(
         user_id=str(user.id),
         role=user.role,
-        seller_approved=user.seller_approved,
+        seller_approved=user.seller_status == SellerStatus.APPROVED.value,
     )
 
     raw_refresh = generate_refresh_token()
@@ -83,6 +83,7 @@ async def register_user(
     email: str,
     password: str,
     role: str,
+    business_name: str | None,
 ) -> AuthResponse:
     """
     Register a new customer or seller account.
@@ -103,11 +104,11 @@ async def register_user(
         email=email.lower(),
         hashed_password=hash_password(password),
         role=role,
-        seller_approved=False if role == "seller" else None,
-        seller_rejected=None,
+        business_name=business_name if role == "seller" else None,
+        seller_status=SellerStatus.PENDING.value if role == "seller" else None,
     )
     db.add(user)
-    await db.flush()  # Assigns user.id without committing
+    await db.flush()
 
     # Create token pair
     access_token, raw_refresh, hashed_refresh, expires_at = (
@@ -125,14 +126,14 @@ async def login_user(
 ) -> AuthResponse:
     """
     Authenticate with email + password.
-    Raises 401 with a generic message — never reveals whether email or password is wrong.
+    Raises 401 with a generic message.
+    Raises 403 if seller is banned.
     """
     stmt = select(User).where(User.email == email.lower())
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    # Generic failure — same message whether user not found, password wrong,
-    # or account has no password (Google-only account).
+    # Generic failure
     if user is None or not verify_password(password, user.hashed_password or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -143,6 +144,13 @@ async def login_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is disabled.",
+        )
+
+    # Banned sellers cannot log in
+    if user.seller_status == SellerStatus.BANNED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account has been permanently banned.",
         )
 
     # Create token pair
@@ -160,9 +168,6 @@ async def refresh_tokens(
 ) -> RefreshResponse:
     """
     Rotate a refresh token.
-    - Old token is marked revoked.
-    - New token pair is issued.
-    - If a revoked token is reused, ALL tokens for that user are revoked (theft detection).
     Raises 401 on any failure.
     """
     token_hash = hash_refresh_token(raw_refresh_token)
@@ -173,24 +178,19 @@ async def refresh_tokens(
 
     now = datetime.now(timezone.utc)
 
-    # Token not found in database
     if token_record is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token.",
         )
 
-    # Token has expired
     if now > token_record.expires_at:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token expired.",
         )
 
-    # ── ROTATION VIOLATION — POSSIBLE THEFT ────────────────────
-    # This token was already used once (revoked=True) and someone
-    # is presenting it again. Revoke ALL tokens for this user
-    # to force a full re-login from both the legitimate user and the attacker.
+    # Rotation violation — possible theft
     if token_record.revoked:
         await db.execute(
             update(RefreshToken)
@@ -202,10 +202,7 @@ async def refresh_tokens(
             detail="Token reuse detected. Please log in again.",
         )
 
-    # Token is valid — perform rotation
     token_record.revoked = True
-
-    # user is loaded via lazy="joined" — no extra query
     user = token_record.user
 
     access_token, raw_new_refresh, hashed_new_refresh, new_expires_at = (
@@ -226,7 +223,7 @@ async def logout_user(
 ) -> None:
     """
     Revoke a specific refresh token.
-    Silently succeeds if token is not found (may have already expired/been cleaned up).
+    Silently succeeds if token is not found.
     """
     token_hash = hash_refresh_token(raw_refresh_token)
 

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models.user import User
+from app.models.user import SellerStatus, User
 
 security = HTTPBearer()
 
@@ -14,13 +14,6 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """
-    FastAPI dependency that extracts and validates the JWT access token
-    from the Authorization: Bearer <token> header.
-    
-    Returns the User ORM object if valid.
-    Raises 401 if token is missing, invalid, expired, or user not found/inactive.
-    """
     token = credentials.credentials
     payload = decode_access_token(token)
 
@@ -63,15 +56,25 @@ async def get_current_user(
 async def require_admin(
     user: User = Depends(get_current_user),
 ) -> User:
-    """
-    Dependency that builds on get_current_user and additionally
-    verifies that the user has the 'admin' role.
-    
-    Use this on admin-only endpoints.
-    """
     if user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required.",
+        )
+    return user
+
+
+async def require_seller(
+    user: User = Depends(get_current_user),
+) -> User:
+    if user.role != "seller":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller access required.",
+        )
+    if user.seller_status != SellerStatus.APPROVED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only approved sellers can perform this action.",
         )
     return user

@@ -1,8 +1,8 @@
-"""initial tables
+"""initial tables v2
 
-Revision ID: 1e2438870643
+Revision ID: 38fc1f9eb6fe
 Revises: 
-Create Date: 2026-07-14 09:15:06.103414
+Create Date: 2026-07-14 17:15:06.118635
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
  
 
 # revision identifiers, used by Alembic.
-revision: str = '1e2438870643'
+revision: str = '38fc1f9eb6fe'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,14 +26,15 @@ def upgrade() -> None:
     sa.Column('hashed_password', sa.String(length=255), nullable=True),
     sa.Column('google_id', sa.String(length=255), nullable=True),
     sa.Column('role', sa.String(length=10), nullable=False),
-    sa.Column('seller_approved', sa.Boolean(), nullable=True),
-    sa.Column('seller_rejected', sa.Boolean(), nullable=True),
-    sa.Column('rejection_reason', sa.Text(), nullable=True),
+    sa.Column('business_name', sa.String(length=255), nullable=True),
+    sa.Column('seller_status', sa.String(length=20), nullable=True),
+    sa.Column('status_reason', sa.Text(), nullable=True),
     sa.Column('is_active', sa.Boolean(), server_default='true', nullable=False),
     sa.Column('id', sa.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("role IN ('customer', 'seller', 'admin')", name='ck_users_role'),
+    sa.CheckConstraint("seller_status IS NULL OR seller_status IN ('pending', 'approved', 'rejected', 'suspended', 'banned')", name='ck_users_seller_status'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email'),
     sa.UniqueConstraint('google_id')

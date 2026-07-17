@@ -6,7 +6,6 @@ from app.models.user import User
 
 async def seed():
     async with async_session_factory() as session:
-        # Check if admin already exists
         stmt = select(User).where(User.email == 'admin@marketplace.com')
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
@@ -20,8 +19,7 @@ async def seed():
             email='admin@marketplace.com',
             hashed_password=hash_password('Admin@123'),
             role='admin',
-            seller_approved=None,
-            seller_rejected=None,
+            seller_status=None,
             is_active=True,
         )
         session.add(admin)

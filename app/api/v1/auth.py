@@ -43,12 +43,13 @@ async def register(
     body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
-    return await auth_service.register_user(
+        return await auth_service.register_user(
         db=db,
         full_name=body.full_name,
         email=body.email,
         password=body.password,
         role=body.role,
+        business_name=body.business_name,
     )
 
 
