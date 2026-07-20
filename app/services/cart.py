@@ -187,16 +187,19 @@ async def _find_existing_item(
     identity: CartIdentity,
     product_id: str,
 ) -> CartItem | None:
+    import uuid
+    prod_uid = uuid.UUID(str(product_id))
     if identity.user_id is not None:
+        user_uid = uuid.UUID(str(identity.user_id))
         stmt = select(CartItem).where(
-            CartItem.user_id == identity.user_id,
-            CartItem.product_id == product_id,
+            CartItem.user_id == user_uid,
+            CartItem.product_id == prod_uid,
         )
     else:
         stmt = select(CartItem).where(
             CartItem.cart_token == identity.cart_token,
             CartItem.user_id.is_(None),
-            CartItem.product_id == product_id,
+            CartItem.product_id == prod_uid,
         )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -206,10 +209,12 @@ async def _get_cart_items(
     db: AsyncSession,
     identity: CartIdentity,
 ) -> list[CartItem]:
+    import uuid
     if identity.user_id is not None:
+        user_uid = uuid.UUID(str(identity.user_id))
         stmt = (
             select(CartItem)
-            .where(CartItem.user_id == identity.user_id)
+            .where(CartItem.user_id == user_uid)
             .order_by(CartItem.created_at.desc())
         )
     else:
