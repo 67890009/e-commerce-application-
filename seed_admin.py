@@ -6,17 +6,21 @@ from app.models.user import User
 
 async def seed():
     async with async_session_factory() as session:
-        stmt = select(User).where(User.email == 'admin@marketplace.com')
+        stmt = select(User).where(User.email == 'admin@gmail.com')
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
 
         if existing:
-            print('Admin already exists')
+            existing.hashed_password = hash_password('Admin@123')
+            existing.role = 'admin'
+            existing.is_active = True
+            await session.commit()
+            print('Admin password updated: admin@gmail.com / Admin@123')
             return
 
         admin = User(
             full_name='Admin',
-            email='admin@marketplace.com',
+            email='admin@gmail.com',
             hashed_password=hash_password('Admin@123'),
             role='admin',
             seller_status=None,

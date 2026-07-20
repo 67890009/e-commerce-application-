@@ -68,8 +68,10 @@ async def get_seller_detail(
     Get detailed info for a single seller.
     Product/order/return counts are 0 until those tables exist.
     """
+    import uuid
+    uid = uuid.UUID(str(seller_id))
     stmt = select(User).where(
-        User.id == seller_id,
+        User.id == uid,
         User.role == "seller",
     )
     result = await db.execute(stmt)
@@ -312,8 +314,10 @@ async def _get_seller_by_id(
 ) -> User:
     """Fetch a seller by ID. Raises 404 if not found or not a seller."""
     from fastapi import HTTPException, status
+    import uuid
+    uid = uuid.UUID(str(seller_id))
 
-    stmt = select(User).where(User.id == seller_id, User.role == "seller")
+    stmt = select(User).where(User.id == uid, User.role == "seller")
     result = await db.execute(stmt)
     seller = result.scalar_one_or_none()
 

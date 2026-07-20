@@ -7,6 +7,9 @@ from app.models.product import Product
 from app.models.cart_item import CartItem
 from app.models.order import Order, OrderItem
 from app.models.payment import Payment
+from app.models.return_request import ReturnRequest
+from app.models.review import Review
+from app.models.wishlist import WishlistItem
 
 __all__ = [
     "Base",
@@ -19,4 +22,7 @@ __all__ = [
     "Order",
     "OrderItem",
     "Payment",
+    "ReturnRequest",
+    "Review",
+    "WishlistItem",
 ]

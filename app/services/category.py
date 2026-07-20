@@ -35,6 +35,8 @@ async def create_category(
     category = Category(
         name=data.name,
         slug=data.slug,
+        description=data.description,
+        image_url=data.image_url,
     )
     db.add(category)
     await db.flush()
@@ -117,7 +119,7 @@ async def update_category(
         existing = await db.scalar(
             select(Category).where(Category.name == data.name)
         )
-        if existing is not None and existing.id != category.id:
+        if existing is not None and str(existing.id) != str(category.id):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Category with this name already exists.",
@@ -128,12 +130,18 @@ async def update_category(
         existing = await db.scalar(
             select(Category).where(Category.slug == data.slug)
         )
-        if existing is not None and existing.id != category.id:
+        if existing is not None and str(existing.id) != str(category.id):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Category with this slug already exists.",
             )
         category.slug = data.slug
+
+    if data.description is not None:
+        category.description = data.description
+
+    if data.image_url is not None:
+        category.image_url = data.image_url
 
     if data.is_active is not None:
         category.is_active = data.is_active
@@ -162,7 +170,9 @@ async def _get_category_by_id(
     db: AsyncSession,
     category_id: str,
 ) -> Category:
-    stmt = select(Category).where(Category.id == category_id)
+    import uuid
+    uid = uuid.UUID(str(category_id))
+    stmt = select(Category).where(Category.id == uid)
     result = await db.execute(stmt)
     category = result.scalar_one_or_none()
 

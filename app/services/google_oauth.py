@@ -78,9 +78,14 @@ async def handle_google_callback(
         )
 
         if token_resp.status_code != 200:
+            try:
+                err_data = token_resp.json()
+                msg = err_data.get("error_description") or err_data.get("error") or token_resp.text
+            except Exception:
+                msg = token_resp.text
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to exchange authorization code with Google.",
+                detail=f"Failed to exchange authorization code with Google: {msg}",
             )
 
         token_data = token_resp.json()
@@ -127,7 +132,7 @@ async def handle_google_callback(
     )
 
     auth_code = GoogleAuthCode(
-        code=hashed_code,
+        code_hash=hashed_code,
         user_id=user.id,
         expires_at=expires_at,
     )
@@ -147,7 +152,7 @@ async def exchange_google_code(
     """
     code_hash = hash_oauth_code(raw_code)
 
-    stmt = select(GoogleAuthCode).where(GoogleAuthCode.code == code_hash)
+    stmt = select(GoogleAuthCode).where(GoogleAuthCode.code_hash == code_hash)
     result = await db.execute(stmt)
     auth_code_record = result.scalar_one_or_none()
 

@@ -163,7 +163,7 @@ async def get_my_order(
     order_id: str,
 ) -> OrderDetailResponse:
     order = await _get_order_by_id(db, order_id)
-    if order.user_id != user_id:
+    if str(order.user_id) != str(user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found.",
@@ -209,7 +209,7 @@ async def get_seller_order(
     order_id: str,
 ) -> OrderDetailResponse:
     order = await _get_order_by_id(db, order_id)
-    if order.seller_id != seller_id:
+    if str(order.seller_id) != str(seller_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found.",
@@ -301,7 +301,9 @@ async def _get_order_by_id(
     db: AsyncSession,
     order_id: str,
 ) -> Order:
-    stmt = select(Order).where(Order.id == order_id)
+    import uuid
+    uid = uuid.UUID(str(order_id))
+    stmt = select(Order).where(Order.id == uid)
     result = await db.execute(stmt)
     order = result.scalar_one_or_none()
 

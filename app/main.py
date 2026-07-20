@@ -1,32 +1,39 @@
+import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.auth import limiter
 from app.api.v1.router import v1_router
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Application lifespan — runs once at startup and once at shutdown.
-    Replace the yield with startup/shutdown logic as needed
-    (e.g., create initial admin user, warm caches).
+    Application lifespan.
+    Place startup and shutdown logic here when needed.
     """
     yield
 
 
 app = FastAPI(
     title=settings.APP_NAME,
+    debug=settings.DEBUG,
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
-    lifespan=lifespan,
 )
 
-# ── CORS ─────────────────────────────────────────────────────────
+# CORS
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,16 +43,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Rate Limiter ─────────────────────────────────────────────────
+# Rate Limiting
+
 
 app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler,
+)
 
-# ── Routes ───────────────────────────────────────────────────────
+
+# Routes
+
 
 app.include_router(v1_router)
 
 
-# ── Global Exception Handler ─────────────────────────────────────
+@app.get("/", tags=["Root"])
+async def root():
+    return {
+        "app": settings.APP_NAME,
+        "status": "running",
+    }
+
+
+@app.get("/health", tags=["Health"])
+async def health():
+    return {
+        "status": "ok",
+    }
+
+
+# Global Exception Handler
 
 
 @app.exception_handler(Exception)
@@ -53,15 +83,20 @@ async def global_exception_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
-    """
-    Catch-all for unhandled exceptions.
-    In production, this prevents stack traces from leaking to clients.
-    In development, we let the exception through for debugging.
-    """
+    logger.exception("Unhandled exception", exc_info=exc)
+
     if settings.DEBUG:
-        raise exc
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "detail": str(exc),
+                "traceback": traceback.format_exc(),
+            },
+        )
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error."},
+        content={
+            "detail": "Internal server error.",
+        },
     )

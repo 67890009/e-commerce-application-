@@ -72,7 +72,7 @@ async def get_seller_product(
 ) -> ProductResponse:
     product = await _get_product_by_id(db, product_id)
 
-    if product.seller_id != seller_id:
+    if str(product.seller_id) != str(seller_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not own this product.",
@@ -89,7 +89,7 @@ async def update_seller_product(
 ) -> ProductResponse:
     product = await _get_product_by_id(db, product_id)
 
-    if product.seller_id != seller_id:
+    if str(product.seller_id) != str(seller_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not own this product.",
@@ -109,6 +109,7 @@ async def update_seller_product(
         product.image_url = data.image_url
 
     await db.flush()
+    product = await _get_product_by_id(db, product_id)
     return ProductResponse.model_validate(product)
 
 
@@ -119,7 +120,7 @@ async def delete_seller_product(
 ) -> None:
     product = await _get_product_by_id(db, product_id)
 
-    if product.seller_id != seller_id:
+    if str(product.seller_id) != str(seller_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not own this product.",
@@ -198,6 +199,7 @@ async def disable_product_admin(
     product.status = ProductStatus.DISABLED.value
     product.disabled_reason = reason
     await db.flush()
+    product = await _get_product_by_id(db, product_id)
     return ProductResponse.model_validate(product)
 
 
@@ -216,6 +218,7 @@ async def enable_product_admin(
     product.status = ProductStatus.ACTIVE.value
     product.disabled_reason = None
     await db.flush()
+    product = await _get_product_by_id(db, product_id)
     return ProductResponse.model_validate(product)
 
 
@@ -233,6 +236,7 @@ async def edit_product_admin(
     product.category_id = str(data.category_id)
     product.image_url = data.image_url
     await db.flush()
+    product = await _get_product_by_id(db, product_id)
     return ProductResponse.model_validate(product)
 
 
@@ -306,8 +310,10 @@ async def get_product_public(
     db: AsyncSession,
     product_id: str,
 ) -> ProductPublicResponse:
+    import uuid
+    uid = uuid.UUID(str(product_id))
     stmt = select(Product).where(
-        Product.id == product_id,
+        Product.id == uid,
         Product.is_active == True,  # noqa: E712
         Product.status == ProductStatus.ACTIVE.value,
     )
@@ -330,7 +336,9 @@ async def _get_product_by_id(
     db: AsyncSession,
     product_id: str,
 ) -> Product:
-    stmt = select(Product).where(Product.id == product_id)
+    import uuid
+    uid = uuid.UUID(str(product_id))
+    stmt = select(Product).where(Product.id == uid)
     result = await db.execute(stmt)
     product = result.scalar_one_or_none()
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -22,4 +22,18 @@ async def verify_payment(
     return await payment_service.verify_payment(
         db=db,
         data=body,
+    )
+
+
+@router.post("/webhook")
+async def razorpay_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_razorpay_signature: str | None = Header(None, alias="X-Razorpay-Signature"),
+) -> dict[str, str]:
+    payload_bytes = await request.body()
+    return await payment_service.handle_razorpay_webhook(
+        db=db,
+        payload_bytes=payload_bytes,
+        signature=x_razorpay_signature,
     )

@@ -18,46 +18,27 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "products"
 
     seller_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True,
     )
-    category_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("categories.id", ondelete="SET NULL"),
-        nullable=False,
+    category_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    stock: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
-    image_url: Mapped[str | None] = mapped_column(
-        String(500), nullable=True
-    )
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default="active"
-    )
-    disabled_reason: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
-    )
+    compare_price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    stock: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, server_default="active")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
-    seller: Mapped["User"] = relationship(
-        "User", lazy="joined", innerjoin=True
-    )
-    category: Mapped["Category"] = relationship(
-        "Category", lazy="joined", innerjoin=True
-    )
+    seller: Mapped["User"] = relationship("User", foreign_keys=[seller_id], lazy="joined", innerjoin=True)  # noqa: F821
+    category: Mapped["Category | None"] = relationship("Category", lazy="joined")  # noqa: F821
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('active', 'disabled')",
-            name="ck_products_status",
-        ),
+        CheckConstraint("status IN ('active', 'disabled')", name="ck_products_status"),
+        CheckConstraint("price >= 0", name="ck_products_price"),
+        CheckConstraint("stock >= 0", name="ck_products_stock"),
     )
 
     def __repr__(self) -> str:

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import enum
+from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Numeric, String, ForeignKey
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,44 +21,26 @@ class Payment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "payments"
 
     order_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("orders.id", ondelete="CASCADE"),
-        unique=True,
-        nullable=False,
-        index=True,
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"),
+        unique=True, nullable=False, index=True,
     )
-    razorpay_order_id: Mapped[str] = mapped_column(
-        String(64), nullable=False, unique=True
-    )
-    razorpay_payment_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, unique=True
-    )
-    razorpay_signature: Mapped[str | None] = mapped_column(
-        String(256), nullable=True
-    )
-    amount: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False
-    )
-    currency: Mapped[str] = mapped_column(
-        String(3), nullable=False, server_default="INR"
-    )
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default="created"
-    )
-    platform_commission: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False
-    )
-    seller_payout_amount: Mapped[float] = mapped_column(
-        Numeric(10, 2), nullable=False
-    )
+    razorpay_order_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    razorpay_payment_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    razorpay_refund_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    refund_amount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="INR")
+    status: Mapped[str] = mapped_column(String(10), nullable=False, server_default="created")
+    platform_commission: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    seller_payout_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    order: Mapped["Order"] = relationship(
-        "Order", lazy="joined", innerjoin=True
-    )
+    order: Mapped["Order"] = relationship("Order", lazy="joined", back_populates="payment")  # noqa: F821
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('created','paid','failed','refunded')",
+            "status IN ('created', 'paid', 'failed', 'refunded')",
             name="ck_payments_status",
         ),
     )

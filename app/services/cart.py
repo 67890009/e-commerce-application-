@@ -54,6 +54,7 @@ async def add_to_cart(
     )
     db.add(item)
     await db.flush()
+    item.product = product
     return _build_item_response(item)
 
 
@@ -229,14 +230,17 @@ async def _get_cart_item_owned(
     identity: CartIdentity,
     item_id: str,
 ) -> CartItem:
+    import uuid
+    uid = uuid.UUID(str(item_id))
     if identity.user_id is not None:
+        user_uid = uuid.UUID(str(identity.user_id))
         stmt = select(CartItem).where(
-            CartItem.id == item_id,
-            CartItem.user_id == identity.user_id,
+            CartItem.id == uid,
+            CartItem.user_id == user_uid,
         )
     else:
         stmt = select(CartItem).where(
-            CartItem.id == item_id,
+            CartItem.id == uid,
             CartItem.cart_token == identity.cart_token,
             CartItem.user_id.is_(None),
         )

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.config import settings
 
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
@@ -16,18 +17,20 @@ engine = create_async_engine(
     max_overflow=20,
 )
 
+
 async_session_factory = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False,
+    autoflush=False,
 )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    FastAPI dependency that yields an async database session.
-    Ensures the session is always closed after the request,
-    even if an exception occurs.
+    FastAPI dependency that provides a database session.
+    Transaction management (commit/rollback) should be handled
+    inside the service layer.
     """
     async with async_session_factory() as session:
         try:

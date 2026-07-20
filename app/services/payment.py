@@ -138,3 +138,68 @@ async def verify_payment(
         message="Payment verified successfully",
         payment=PaymentResponse.model_validate(payment),
     )
+
+
+async def handle_razorpay_webhook(
+    db: AsyncSession,
+    payload_bytes: bytes,
+    signature: str | None,
+) -> dict[str, str]:
+    """
+    Handle incoming Razorpay Webhook events.
+    Verifies signature and processes events like payment.captured, payment.failed, order.paid.
+    """
+    import json
+
+    if not settings.RAZORPAY_TEST_MODE and settings.RAZORPAY_WEBHOOK_SECRET:
+        if not signature:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing X-Razorpay-Signature header.",
+            )
+        expected_sig = hmac.new(
+            settings.RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+            payload_bytes,
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected_sig, signature):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid webhook signature.",
+            )
+
+    try:
+        data = json.loads(payload_bytes.decode("utf-8"))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON payload.",
+        )
+
+    event = data.get("event")
+    payload = data.get("payload", {})
+    payment_entity = payload.get("payment", {}).get("entity", {})
+    razorpay_order_id = payment_entity.get("order_id") or payload.get("order", {}).get("entity", {}).get("id")
+
+    if razorpay_order_id:
+        stmt = select(Payment).where(Payment.razorpay_order_id == razorpay_order_id)
+        result = await db.execute(stmt)
+        payment = result.scalar_one_or_none()
+
+        if payment:
+            if event in ("payment.captured", "order.paid"):
+                payment.status = PaymentStatus.PAID.value
+                payment.razorpay_payment_id = payment_entity.get("id") or payment.razorpay_payment_id
+
+                order_stmt = select(Order).where(Order.id == payment.order_id)
+                order_res = await db.execute(order_stmt)
+                order = order_res.scalar_one_or_none()
+                if order and order.status == OrderStatus.PENDING.value:
+                    order.status = OrderStatus.CONFIRMED.value
+
+            elif event == "payment.failed":
+                payment.status = PaymentStatus.FAILED.value
+
+            await db.flush()
+
+    return {"status": "ok"}

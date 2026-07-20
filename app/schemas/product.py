@@ -45,14 +45,15 @@ class ReasonRequest(BaseModel):
 class ProductResponse(BaseModel):
     id: UUID
     seller_id: UUID
-    category_id: UUID
+    category_id: UUID | None = None
     name: str
     description: str | None
     price: Decimal
+    compare_price: Decimal | None = None
     stock: int
     image_url: str | None
     status: str
-    disabled_reason: str | None
+    disabled_reason: str | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -64,9 +65,10 @@ class ProductListItemResponse(BaseModel):
     id: UUID
     name: str
     price: Decimal
+    compare_price: Decimal | None = None
     stock: int
     image_url: str | None
-    category_id: UUID
+    category_id: UUID | None = None
     seller_id: UUID
     status: str
     created_at: datetime
@@ -79,9 +81,10 @@ class ProductPublicResponse(BaseModel):
     name: str
     description: str | None
     price: Decimal
+    compare_price: Decimal | None = None
     stock: int
     image_url: str | None
-    category_id: UUID
+    category_id: UUID | None = None
     seller_id: UUID
     created_at: datetime
 
