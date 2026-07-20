@@ -32,7 +32,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    stmt = select(User).where(User.id == user_id)
+    import uuid
+    uid = uuid.UUID(str(user_id))
+    stmt = select(User).where(User.id == uid)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 

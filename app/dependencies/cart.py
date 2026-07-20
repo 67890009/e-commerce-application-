@@ -43,7 +43,9 @@ async def get_current_user_optional(
     if user_id is None:
         return None
 
-    stmt = select(User).where(User.id == user_id, User.is_active == True)  # noqa: E712
+    import uuid
+    uid = uuid.UUID(str(user_id))
+    stmt = select(User).where(User.id == uid, User.is_active == True)  # noqa: E712
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
