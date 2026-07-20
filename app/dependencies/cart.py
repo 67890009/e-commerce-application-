@@ -15,27 +15,20 @@ class CartIdentity:
         self.cart_token = cart_token
 
 
-async def get_optional_bearer(
-    authorization: str | None = Header(None),
-) -> dict | None:
-    if authorization is None:
-        return None
-    if not authorization.startswith("Bearer "):
-        return None
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
-        return None
-    return {"token": token}
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+optional_security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user_optional(
-    credentials: dict | None = Depends(get_optional_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
     if credentials is None:
         return None
 
-    payload = decode_access_token(credentials["token"])
+    token = credentials.credentials
+    payload = decode_access_token(token)
     if payload is None:
         return None
 
