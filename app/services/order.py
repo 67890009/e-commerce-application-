@@ -32,34 +32,40 @@ async def create_order(
     identity: CartIdentity,
 ) -> CreateOrderResponse:
     from app.services.payment import create_razorpay_order
+    import uuid
 
-    seller_id = str(data.seller_id)
+    user_uid = uuid.UUID(str(identity.user_id)) if identity.user_id else None
 
-    # Fetch cart items for this seller
+    # Fetch cart items
     if identity.user_id is not None:
-        stmt = select(CartItem).where(
-            CartItem.user_id == identity.user_id,
-            CartItem.product_id.in_(
-                select(Product.id).where(Product.seller_id == seller_id)
-            ),
-        )
+        stmt = select(CartItem).where(CartItem.user_id == user_uid)
     else:
         stmt = select(CartItem).where(
             CartItem.cart_token == identity.cart_token,
             CartItem.user_id.is_(None),
+        )
+
+    if data.seller_id is not None:
+        seller_uid = uuid.UUID(str(data.seller_id))
+        stmt = stmt.where(
             CartItem.product_id.in_(
-                select(Product.id).where(Product.seller_id == seller_id)
-            ),
+                select(Product.id).where(Product.seller_id == seller_uid)
+            )
         )
 
     result = await db.execute(stmt)
     cart_items = list(result.scalars().all())
 
     if not cart_items:
+        detail_msg = "No items in cart for this seller." if data.seller_id else "Cart is empty."
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No items in cart for this seller.",
+            detail=detail_msg,
         )
+
+    seller_id = str(data.seller_id) if data.seller_id is not None else str(cart_items[0].product.seller_id)
+    if data.seller_id is None:
+        cart_items = [ci for ci in cart_items if str(ci.product.seller_id) == seller_id]
 
     # Validate stock and build order items
     order_items_data = []

@@ -35,7 +35,7 @@ class OrderItemResponse(BaseModel):
 
 
 class CreateOrderRequest(BaseModel):
-    seller_id: UUID
+    seller_id: UUID | None = None
     shipping_address: ShippingAddressSchema
 
 
